@@ -18,13 +18,21 @@
 <script src="jquery.min.js"></script>
 <script src="highstock.js"></script>
 <script>
+    Array.prototype.max = function() {
+        return Math.max.apply(null, this);
+    };
+
+    Array.prototype.min = function() {
+        return Math.min.apply(null, this);
+    };
+
     var seriesOptions = [],
         seriesCounter = 0,
         names = [
-            //'01_04_2009_12_07_01_ch1_datafile.bin',
+            '01_04_2009_12_07_01_ch1_datafile.bin'
             //'01_04_2009_12_23_30_ch1_datafile.bin',
             //'01_04_2009_12_32_03_ch1_datafile.bin',
-            '01_04_2009_12_21_01_ch1_datafile.bin'
+            // '01_04_2009_12_21_01_ch1_datafile.bin'
         ];
 
     var openFile = function(event) {
@@ -33,7 +41,14 @@
         var reader = new FileReader();
         reader.onload = function(e){
             var text = reader.result;
-            openBin(text);
+
+            Highcharts.charts.every(function(e){
+                e && e.destroy();
+            });
+            seriesOptions = [];
+            seriesCounter = 0;
+
+            openBin(0, text.trim());
         };
         reader.readAsText(input.files[0]);
     };
@@ -46,38 +61,22 @@
     });
 
     function openBin(i, name) {
-        $.ajax('data/' + name).done(function(data) {
-            var parser = new jParser(data, {
-                header: {
-                    sign: ['string', 4],
-                    channels: 'int32',
-                    channel_size: 'int32',
-                    spectral_lines: 'int32',
-                    cutoff_frequency: 'int32',
-                    frequency_resolution: 'float32',
-                    block_receipt_time: 'float32',
-                    block_receipt_time_total: 'int32',
-                    block_count: 'int32',
-                    block_size: 'int32',
-                    block_count_real: 'int32',
-                    block_size_max: 'float32',
-                    block_size_min: 'float32'
-                },
-                body: {
-                    _data: ['array', 'float32', (data.length - 100*4)/4]
-                }
+        // todo file name
+        $.post('http://localhost:3000/', {name: name}).done(function(data) {
+            var points = data.data;
+
+            var chartData = [];
+            points.map(function(e, i) {
+                chartData.push([i, e]);
             });
 
-            var currentData = {
-                head: parser.parse('header'),
-                body: parser.parse('body')
-            };
+            console.log('max:', data.block_size_max);
+            console.log('min:', data.block_size_min);
+            console.log('кол-во дискретный точек N:', data.channel_size);
 
             seriesOptions[i] = {
                 name: name,
-                data: currentData.body._data.map(function(e, i) {
-                    return [i, e];
-                })
+                data: chartData
             };
 
             // As we're loading the data asynchronously, we don't know what order it will arrive. So
