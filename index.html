@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ОЭДиСС Казаков</title>
+</head>
+<body>
+
+<input type='file' accept='text/plain' onchange='openFile(event)'>
+
+<div id='output'>
+</div>
+
+<!--<div id="container" style="width:100%; height:400px;"></div>-->
+
+<!--<script src="https://raw.github.com/vjeux/jDataView/master/jquery/jquery-1.7.1-binary-ajax.js"></script>-->
+<script src="jdataview.js"></script>
+<script src="node_modules/jParser/src/jparser.js"></script>
+
+<script src="/bower_components/jquery/dist/jquery.min.js"></script>
+<script src="/bower_components/highcharts/highcharts.js"></script>
+<script>
+    var openFile = function(event) {
+        var input = event.target;
+
+        var reader = new FileReader();
+        reader.onload = function(e){
+            var text = reader.result;
+            //console.log(reader.result.substring(0, 200));
+
+            //window.targetFile = text;
+            openBin(text);
+        };
+        reader.readAsText(input.files[0]);
+    };
+
+    //debug
+    openBin('01_04_2009_12_07_01_ch1_datafile.bin');
+
+    function openBin(name) {
+        $.ajax('data/' + name).done(function(data) {
+            console.log(data);
+            var parser = new jParser(data, {
+                magic: {
+                    sign: ['string', 4],
+                    channels: 'int32',
+                    channel_size: 'int32',
+                    spectral_lines: 'int32',
+                    cutoff_frequency: 'int32',
+                    frequency_resolution: 'float32',
+                    block_receipt_time: 'float32',
+                    block_receipt_time_total: 'int32',
+                    block_count: 'int32',
+                    block_size: 'int32',
+                    block_count_real: 'int32',
+                    block_size_max: 'float32',
+                    block_size_min: 'float32',
+                    _data: ['array', 'float32', 4096]
+                }
+            });
+            console.log(parser.parse('magic'));
+        }, 'dataview');
+    };
+
+    $(function () {
+        var myChart = Highcharts.chart('container', {
+            chart: {
+                type: 'bar'
+            },
+            title: {
+                text: 'Fruit Consumption'
+            },
+            xAxis: {
+                categories: ['Apples', 'Bananas', 'Oranges']
+            },
+            yAxis: {
+                title: {
+                    text: 'Fruit eaten'
+                }
+            },
+            series: [{
+                name: 'Jane',
+                data: [1, 0, 4]
+            }, {
+                name: 'John',
+                data: [5, 7, 3]
+            }]
+        });
+    });
+</script>
+</body>
+</html>
