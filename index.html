@@ -35,13 +35,16 @@
     };
 
     //debug
-    openBin('01_04_2009_12_07_01_ch1_datafile.bin');
+    openBin('01_04_2009_12_16_01_ch1_datafile.bin');
+    openBin('01_04_2009_12_23_30_ch1_datafile.bin');
+    openBin('01_04_2009_12_32_03_ch1_datafile.bin');
+    openBin('01_04_2009_12_21_01_ch1_datafile.bin');
 
     function openBin(name) {
         $.ajax('data/' + name).done(function(data) {
-            console.log(data);
+            //console.log(data);
             var parser = new jParser(data, {
-                magic: {
+                header: {
                     sign: ['string', 4],
                     channels: 'int32',
                     channel_size: 'int32',
@@ -54,11 +57,24 @@
                     block_size: 'int32',
                     block_count_real: 'int32',
                     block_size_max: 'float32',
-                    block_size_min: 'float32',
-                    _data: ['array', 'float32', 4096]
+                    block_size_min: 'float32'
                 }
             });
-            console.log(parser.parse('magic'));
+            var header = parser.parse('header');
+            console.log(header);
+
+            console.log(header.block_count * header.block_size);
+
+            var parser2 = new jParser(data, {
+                body: {
+                    _data: 'float32'
+                }
+            });
+
+//            for(var i = 0; i < header.block_count * header.block_size; i++) {
+//                console.log(i, parser2.parse('body')._data);
+//            }
+
         }, 'dataview');
     };
 
