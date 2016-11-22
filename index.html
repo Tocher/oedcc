@@ -11,38 +11,42 @@
 <div id='output'>
 </div>
 
-<!--<div id="container" style="width:100%; height:400px;"></div>-->
+<div id="container" style="width:100%; height:400px;"></div>
 
-<!--<script src="https://raw.github.com/vjeux/jDataView/master/jquery/jquery-1.7.1-binary-ajax.js"></script>-->
 <script src="jdataview.js"></script>
 <script src="jparser.js"></script>
-
 <script src="jquery.min.js"></script>
-<script src="highcharts.js"></script>
+<script src="highstock.js"></script>
 <script>
+    var seriesOptions = [],
+        seriesCounter = 0,
+        names = [
+            //'01_04_2009_12_07_01_ch1_datafile.bin',
+            //'01_04_2009_12_23_30_ch1_datafile.bin',
+            //'01_04_2009_12_32_03_ch1_datafile.bin',
+            '01_04_2009_12_21_01_ch1_datafile.bin'
+        ];
+
     var openFile = function(event) {
         var input = event.target;
 
         var reader = new FileReader();
         reader.onload = function(e){
             var text = reader.result;
-            //console.log(reader.result.substring(0, 200));
-
-            //window.targetFile = text;
             openBin(text);
         };
         reader.readAsText(input.files[0]);
     };
 
     //debug
-    openBin('01_04_2009_12_16_01_ch1_datafile.bin');
-    openBin('01_04_2009_12_23_30_ch1_datafile.bin');
-    openBin('01_04_2009_12_32_03_ch1_datafile.bin');
-    openBin('01_04_2009_12_21_01_ch1_datafile.bin');
+    var globalStock = [];
 
-    function openBin(name) {
+    $.each(names, function(i, e) {
+        openBin(i, e);
+    });
+
+    function openBin(i, name) {
         $.ajax('data/' + name).done(function(data) {
-            //console.log(data);
             var parser = new jParser(data, {
                 header: {
                     sign: ['string', 4],
@@ -58,51 +62,79 @@
                     block_count_real: 'int32',
                     block_size_max: 'float32',
                     block_size_min: 'float32'
-                }
-            });
-            var header = parser.parse('header');
-            console.log(header);
-
-            console.log(header.block_count * header.block_size);
-
-            var parser2 = new jParser(data, {
+                },
                 body: {
-                    _data: 'float32'
+                    _data: ['array', 'float32', (data.length - 100*4)/4]
                 }
             });
 
-//            for(var i = 0; i < header.block_count * header.block_size; i++) {
-//                console.log(i, parser2.parse('body')._data);
-//            }
+            var currentData = {
+                head: parser.parse('header'),
+                body: parser.parse('body')
+            };
+
+            seriesOptions[i] = {
+                name: name,
+                data: currentData.body._data.map(function(e, i) {
+                    return [i, e];
+                })
+            };
+
+            // As we're loading the data asynchronously, we don't know what order it will arrive. So
+            // we keep a counter and create the chart when all the data is loaded.
+            seriesCounter += 1;
+
+            if (seriesCounter === names.length) {
+                createChart();
+            }
 
         }, 'dataview');
-    };
+    }
 
-    $(function () {
-        var myChart = Highcharts.chart('container', {
-            chart: {
-                type: 'bar'
-            },
-            title: {
-                text: 'Fruit Consumption'
-            },
-            xAxis: {
-                categories: ['Apples', 'Bananas', 'Oranges']
-            },
-            yAxis: {
-                title: {
-                    text: 'Fruit eaten'
-                }
-            },
-            series: [{
-                name: 'Jane',
-                data: [1, 0, 4]
-            }, {
-                name: 'John',
-                data: [5, 7, 3]
-            }]
+    /* sadasd */
+    function createChart() {
+
+        Highcharts.stockChart('container', {
+
+//            rangeSelector: {
+//                selected: 4
+//            },
+
+//            yAxis: {
+//                labels: {
+//                    formatter: function () {
+//                        return (this.value > 0 ? ' + ' : '') + this.value + '%';
+//                    }
+//                },
+//                plotLines: [{
+//                    value: 0,
+//                    width: 2,
+//                    color: 'silver'
+//                }]
+//            },
+
+//            yAxis: {
+//                title: {
+//                    text: 'Temperature (°C)'
+//                }
+//            },
+
+//            plotOptions: {
+//                series: {
+//                    compare: 'percent',
+//                    showInNavigator: true
+//                }
+//            },
+
+//            tooltip: {
+//                pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.change}%)<br/>',
+//                valueDecimals: 2,
+//                split: true
+//            },
+
+            series: seriesOptions
         });
-    });
+    }
 </script>
 </body>
 </html>
