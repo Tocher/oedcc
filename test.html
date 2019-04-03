@@ -1,0 +1,276 @@
+<div class="file_upload">
+    <input type='file' class="data">
+</div>
+
+<div class="some">
+    <div id="chart" class="chart" style="width:100%; height:400px;"></div>
+    <div class="run">RUN</div>
+    <div class="pointsNumber"></div>
+    <div id="amplChart" class="amplChart" style="width:100%; height:400px;"></div>
+</div>
+
+<script src="bower_components/jquery/dist/jquery.min.js"></script>
+<script src="bower_components/highcharts/highstock.js"></script>
+
+<script>
+$(function(){
+    var wrapper = $( ".file_upload" ),
+        inp = wrapper.find( "input" ),
+        btn = wrapper.find( ".button" ),
+        lbl = wrapper.find( "mark" );
+
+    // Crutches for the :focus style:
+    inp.focus(function(){
+        wrapper.addClass( "focus" );
+    }).blur(function(){
+        wrapper.removeClass( "focus" );
+    });
+
+    var file_api = ( window.File && window.FileReader && window.FileList && window.Blob ) ? true : false;
+
+    inp.change(function(){
+        console.log('change');
+        var file_name;
+        if( file_api && inp[ 0 ].files[ 0 ] )
+            file_name = inp[ 0 ].files[ 0 ].name;
+        else
+            file_name = inp.val().replace( "C:\\fakepath\\", '' );
+
+        if( ! file_name.length )
+            return;
+
+        if( lbl.is( ":visible" ) ){
+            lbl.text( file_name );
+            btn.text( "Выбрать" );
+        }else
+            btn.text( file_name );
+    }).change();
+
+});
+$( window ).resize(function(){
+    $( ".file_upload input" ).triggerHandler( "change" );
+});
+
+
+$(function() {
+
+    var dataInput = $('.data'),
+        signal = $('.signal'),
+        signals = $('.signals');
+
+    Highcharts.createElement('link', {
+        href: 'https://fonts.googleapis.com/css?family=Unica+One',
+        rel: 'stylesheet',
+        type: 'text/css'
+    }, null, document.getElementsByTagName('head')[0]);
+
+    function openFile(event) {
+        var input = event.target;
+
+        var reader = new FileReader();
+        reader.onload = function(e){
+            var text = reader.result;
+            //console.log(reader.result.substring(0, 200));
+
+            //window.targetFile = text;
+            openBin(text);
+        };
+        reader.readAsText(input.files[0]);
+    }
+
+
+    function loadFile(e) {
+        var i;
+
+        signals.empty();
+
+        for (i = 0; i < e.target.files.length; i++) {
+            (function () {
+                var name = e.target.files[i].name,
+                    copy = signal.clone();
+
+                copy.addClass(btoa(name));
+
+                signals.append(copy);
+
+                var fr = new FileReader();
+                fr.onload = function () {
+                    showResult(fr.result, name);
+                    dataInput.val('');
+                };
+
+                fr.readAsArrayBuffer(e.target.files[i]);
+            })()
+        }
+
+
+    }
+
+    function generateRangeButtons(range, time) {
+        return Array.apply(null, Array(range - 5)).map(function (_, i) {
+            return {
+                type: 'millisecond',
+                count: Math.pow(2, 6 + i) * time,
+                text: Math.pow(2, 6 + i)
+            }
+        });
+    }
+
+    function getSpectrum(signal, cutOffFrequency, func){
+        var res = [],
+            j;
+
+        for (j = 0; j < cutOffFrequency; j++) {
+            res[j] = 2 * signal.reduce(function(sum, point, i) {
+                return sum + point * func(2 * Math.PI * i * j / signal.length);
+            }) / signal.length;
+        }
+
+        return res;
+    }
+
+    function getAmplSpectrum(frame, cutOffFrequency){
+        var res = [],
+            j,
+            cosSpectrum = getSpectrum(frame, cutOffFrequency, Math.cos),
+            sinSpectrum = getSpectrum(frame, cutOffFrequency, Math.sin);
+
+        for (j = 0; j <= cutOffFrequency - 1; j++) {
+            res[j] = Math.sqrt(Math.pow(sinSpectrum[j], 2) + Math.pow(cosSpectrum[j], 2));
+        }
+
+        return res;
+    }
+
+    function showResult(result, name) {
+        var container = $('.some'),
+            nameConatiner = container.find('.name'),
+            run = container.find('.run'),
+            amplChart = container.find('.amplChart'),
+            max = container.find('.max'),
+            min = container.find('.min'),
+            fluctuationsSwing = container.find('.fluctuationsSwing'),
+            meanSquare = container.find('.meanSquare'),
+            peakFactor = container.find('.peakFactor'),
+            pointsNumberInput = container.find('.pointsNumber'),
+            chart = container.find('.chart'),
+            signalChart;
+
+        var data = {
+            channels: 0,
+            channelPoints: 0,
+            spectralLines: 0,
+            cutOffFrequency: 0,
+            frequencyResolution: 0,
+            blockTime: 0,
+            totalTime: 0,
+            userBlockNumber: 0,
+            dataSize: 0,
+            systemBlockNumber: 0,
+            max: 0,
+            min: 0,
+            signal: []
+        };
+
+        container.toggleClass('hidden', false);
+        nameConatiner.text('Выбранный файл: ' + name);
+
+        data.channels = new Int32Array(result, 4, 1)[0];
+        data.channelPoints = new Int32Array(result, 8, 1)[0];
+        data.spectralLines = new Int32Array(result, 12, 1)[0];
+        data.cutOffFrequency = new Int32Array(result, 16, 1)[0];
+        data.frequencyResolution = new Float32Array(result, 20, 1)[0];
+        data.blockTime = new Float32Array(result, 24, 1)[0];
+        data.totalTime = new Int32Array(result, 28, 1)[0];
+        data.userBlockNumber = new Int32Array(result, 32, 1)[0];
+        data.dataSize = new Int32Array(result, 36, 1)[0];
+        data.systemBlockNumber = new Int32Array(result, 40, 1)[0];
+        data.max = new Float32Array(result, 44, 1)[0];
+        data.min = new Float32Array(result, 48, 1)[0];
+        data.signal = Array.prototype.slice.call(new Float32Array(result, 52, data.dataSize));
+
+        signalChart = Highcharts.stockChart(chart[0], {
+            rangeSelector: {
+                buttons: generateRangeButtons(Math.log2(data.channelPoints), data.blockTime * 1000 / data.channelPoints),
+                selected: Math.log2(data.channelPoints) - 6,
+                inputDateFormat: '%H:%M:%S.%L',
+                inputEditDateFormat: '%H:%M:%S.%L',
+
+                inputDateParser: function (value) {
+                    value = value.split(/[:\.]/);
+                    return Date.UTC(
+                        1970,
+                        0,
+                        1,
+                        parseInt(value[0], 10),
+                        parseInt(value[1], 10),
+                        parseInt(value[2], 10),
+                        parseInt(value[3], 10)
+                    );
+                }
+            },
+
+            title: {
+                text: 'Сигнал'
+            },
+            exporting: {
+                sourceWidth: 1920,
+                sourceHeight: 1024
+            },
+            series: [{
+                name: 'Сигнал',
+                data: data.signal,
+                dataGrouping: {
+                    enabled: false
+                },
+                pointInterval: (data.totalTime * 1000 / data.dataSize)
+            }]
+
+        });
+
+        pointsNumberInput.val(data.channelPoints);
+
+        function update() {
+            var offset = Math.floor(signalChart.xAxis[0].getExtremes().min / (data.totalTime * 1000 / data.dataSize)),
+                frameSize = parseInt(pointsNumberInput.val()),
+                frame = data.signal.slice(offset, offset + frameSize),
+                minValue = Math.min.apply(null, frame),
+                maxValue = Math.max.apply(null, frame),
+                meanSquareValue = Math.sqrt(frame.reduce(function (sum, point) {
+                    return sum + point * point;
+                }, 0) / frameSize);
+
+            min.text(minValue);
+            max.text(maxValue);
+            fluctuationsSwing.text(Math.abs(maxValue-minValue));
+            meanSquare.text(Math.sqrt(frame.reduce(function (sum, point) {
+                return sum + point * point;
+            }, 0) / frameSize));
+            peakFactor.text(maxValue / meanSquareValue);
+
+            Highcharts.chart(amplChart[0], {
+                chart: {
+                    type: 'column'
+                },
+                title: {
+                    text: 'Амплитудный спектр сигнала'
+                },
+                exporting: {
+                    sourceWidth: 1920,
+                    sourceHeight: 1024
+                },
+                series: [{
+                    name: 'Амплитуда',
+                    data: getAmplSpectrum(frame, data.cutOffFrequency)
+                }]
+            });
+        }
+
+        run.on('click', update);
+    }
+
+    dataInput.on('change', loadFile);
+
+
+});
+</script>
